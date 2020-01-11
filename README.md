@@ -232,15 +232,25 @@ mymap.erase('a');
 ---
 ![set](https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Red-black_tree_example.svg/500px-Red-black_tree_example.svg.png)
 
-std::set - множество. Элементы уникальны, а так же сравниваются и сортируются при добавлении. Чаще всего реализовано так же как и std::map с помощью красно-черных деревьев.
+std::set - множество. Элементы уникальны, а так же сравниваются и сортируются при добавлении по возрастанию. Чаще всего реализовано так же как и std::map с помощью красно-черных деревьев.
+##### Библиотека и создание:
+```cpp
+#include <set>
+
+set <тип> имя{2,3,4};
+``
+
 ##### Основные методы:
 - insert
-- erase
+- erase (удаляет элемент, все элементы по значению или диапазон элементов)
 - swap
 - clear
 - emplace
-- find
-
+- find (поиск элемента по значению. выводит: местонахождение(итератор) или значение на конец контейнера)
+- lower_bound / upper_bound (находит элемент >= ключу / находит элемент > ключа)
+```cpp
+имя.lower_bound(key);
+```
 ###### Сложность такая же как и у std::map в силу использования одинаковой структуры данных
 
 ###### Пример работы:
@@ -250,26 +260,26 @@ std::set<int>::iterator it;
 std::pair<std::set<int>::iterator,bool> ret;
 
 // set some initial values:
-for (int i=1; i<=5; ++i) myset.insert(i*10);    // set: 10 20 30 40 50
+for (int i=1; i<=5; ++i)
+    myset.insert(i*10);    // set: 10 20 30 40 50
 
 ret = myset.insert(20);               // no new element inserted
 
-if (ret.second==false) it=ret.first;  // "it" now points to element 20
+if (ret.second==false)
+    it=ret.first;  // "it" now points to element 20
 
-myset.insert (it,25);                 // max efficiency inserting
-myset.insert (it,24);                 // max efficiency inserting
-myset.insert (it,26);                 // no max efficiency inserting
+myset.insert (it,25);
 
 int myints[]= {5,10,15};              // 10 already in set, not inserted
-myset.insert (myints,myints+3);       // myset: 5 10 15 20 24 25 26 30 40 50
+myset.insert (myints,myints+3);       // myset: 5 10 15 20 25 30 40 50
 
-myset.erase(10); // myset: 5 15 20 24 25 26 30 50
+myset.erase(10); // myset: 5 15 20 25 30 50
 it = myset.begin();
-it ++;
+it++;
 
-myset.erase(it); // myset: 5 20 24 25 26 30 50
+myset.erase(it); // myset: 5 20 25 30 50
 it = myset.find(25);
-myset.erase(it, myset.end()); // myset: 5 20 24
+myset.erase(it, myset.end()); // myset: 5 20
 
 std::set<int> myset2 {1, 2, 3};
 myset2.emplace(4);
