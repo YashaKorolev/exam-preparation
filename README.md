@@ -524,7 +524,6 @@ void slog()
     cout << endl << "Rezyltat clogenia= " << a1[0];
 }
 };
-
 int main()
 {
     Te <int> F;
