@@ -242,7 +242,7 @@ set <тип> имя{2,3,4};
 
 ##### Основные методы:
 - insert
-- erase (удаляет элемент, все элементы по значению или диапазон элементов)
+- erase (удаляет элемент (по итератору), все элементы по значению или диапазон элементов)
 - swap
 - clear
 - emplace
@@ -255,57 +255,107 @@ set <тип> имя{2,3,4};
 
 ###### Пример работы:
 ```cpp
-std::set<int> myset;
-std::set<int>::iterator it;
-std::pair<std::set<int>::iterator,bool> ret;
+    std::set<int> myset;
+    std::set<int>::iterator it;
+    std::pair<std::set<int>::iterator,bool> ret;
 
-// set some initial values:
-for (int i=1; i<=5; ++i)
-    myset.insert(i*10);    // set: 10 20 30 40 50
+    // set some initial values:
+    for (int i=1; i<=5; ++i)
+        myset.insert(i*10);    // set: 10 20 30 40 50
 
-ret = myset.insert(20);               // no new element inserted
+    ret = myset.insert(20);               // no new element inserted
 
-if (ret.second==false)
-    it=ret.first;  // "it" now points to element 20
+    if (ret.second==false)
+        it=ret.first;  // "it" now points to element 20
 
-myset.insert (it,25);
+    myset.insert (it,25);
 
-int myints[]= {5,10,15};              // 10 already in set, not inserted
-myset.insert (myints,myints+3);       // myset: 5 10 15 20 25 30 40 50
+    int myints[]= {5,10,15};              // 10 already in set, not inserted
+    myset.insert (myints,myints+3);       // myset: 5 10 15 20 25 30 40 50
 
-myset.erase(10); // myset: 5 15 20 25 30 50
-it = myset.begin();
-it++;
+    myset.erase(10); // myset: 5 15 20 25 30 50
+    it = myset.begin();
+    it++;
 
-myset.erase(it); // myset: 5 20 25 30 50
-it = myset.find(25);
-myset.erase(it, myset.end()); // myset: 5 20
+    myset.erase(it); // myset: 5 20 25 30 50
+    it = myset.find(25);
+    myset.erase(it, myset.end()); // myset: 5 20
 
-std::set<int> myset2 {1, 2, 3};
-myset2.emplace(4);
+    std::set<int> myset2 {1, 2, 3};
+    myset2.emplace(4);
 
-myset1.swap(myset2)
+    myset1.swap(myset2)
+ for (auto& x:mymap)
+   std::cout << x.first << " " << x.second;
 ```
 
 #### 4. Класс std::unordered_map. Внутренняя реализация unordered_map, его основные методы. Сложность поиска, сортировки, удаления элемента, добавления элемента. Пример работы с std:: unordered_map
 ---
 unordered_map - является ассоциативным контейнером, который содержит пары ключ-значение с уникальными ключами. Поиск, вставка и удаление выполняются за константное время. 
 Внутренне unordered_map реализована с использованием хэш-таблицы, ключ хэшируется в индексы хэш-таблицы, поэтому производительность структуры данных во многом зависит от хэш-функции, но в среднем вставка и удаление из хэш-таблицы составляет О(1).
+Неупорядоченные контейнеры реализуют оператор прямого доступа[], который позволяет осуществлять прямой доступ к значению, использую его ключв качестве аргументов. Никакие два элемента не могу иметь эквивалентные ключи.
 ![hash_table](http://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/HASHTB08.svg/362px-HASHTB08.svg.png)
 
+### Начало работы
+```cpp
+#include <unordered_map>
+
+std::unordered_map <тип ключа, тип значения> имя;
+имя[ключ]= значение;
+
+ //или сразу
+
+std::unordered_map <bool, int> mymap2 = { {true, 4}, {false, 43}};
+```
 ##### Основные методы:
 - emplace
-- emplace_hint (hint - итератор используемый в качестве предположения о позиции, в которую нужно вставить новый элемент)
+- emplace_hint (возможно вставить в определенную позицию)
 ```cpp
-template <class... Args>
-iterator emplace_hint (const_iterator hint, Args&&... args );
+unordered_map.emplace_hint(позиция, клюс, значение)
 ```
 - insert
-- erase
-- clear
-- swap
-- find
+- erase (удаляет из контейнера один или несколько элементов)
+- clear (зачищает контейнер)
+- swap (обменивается сожержимым)
+- find (возвращает итератор на найденный элемент или итератор на конец контейнера)
 
+Можно вывести непосредственно ключ и значение:
+```cpp
+std::cout <<got->first << "is" << got->second; // got - итератор на пару
+```
+
+##### Пример
+```cpp
+#include <iostream>
+#include <unordered_map>
+int main()
+{
+    std::unordered_map <bool, int> mymap;
+    mymap[false]=3;
+    mymap[true] = 17;
+
+   mymap.insert(std::make_pair<bool,int> (false, 4));
+
+   std::unordered_map <bool, int> mymap2;
+       mymap[false]=43;
+       mymap[true] = 54;
+
+   mymap.insert(mymap2.begin(), mymap2.end());
+
+   mymap.swap(mymap2);
+
+   mymap2.erase (false);
+
+   mymap.erase(mymap.begin());
+
+   mymap2.emplace(false, 83);
+
+   mymap2.erase(mymap2.begin(), mymap2.end()); //удаление с позиции по позицию (не включительно)
+
+   for (auto& x:mymap)
+   std::cout << x.first << " " << x.second;
+}
+```
 #### 5. Класс std::vector. Внутренняя реализация vector, его основные методы. Сложность поиска, сортировки, удаления элемента, добавления элемента. Пример работы с std::vector. Особенность std::vector<bool>.
 ---
 std :: vector - динамический массив. Как и массивы, используются последовательные участки памяти для своих элементов, это также означает, что они могут быть использованы как в массиве по указателю, так и по распределенному указателю. Размер может изменяться автоматически, а размер автоматически обрабатывается контейнером.
