@@ -1499,30 +1499,171 @@ shared_ptr.
 
 #### 16. RAII. «Умные» указатели. std::unique_ptr. Примеры.
 ---
-- Шаблонный класс unique_ptr представляет собой уникальный указатель на объект. Указатель нельзя копировать, но можно передавать владение им с помощью std::move. При уничтожении указателя автоматически вызывается деструктор объекта, на который он указывает. Cовместим с STL-контейнерами, поддерживает custom deleter.
+- Шаблонный класс unique_ptr представляет собой уникальный указатель на объект.Его нужно использовать для управления
+ любым динамически выделенным объектом/ресурсом, но с условием, что unique_ptr полность владеет переданным
+ ему объектом, а не делится владением еще с другими классами. Указатель нельзя копировать, но можно передавать владение им с помощью std::move. При уничтожении указателя автоматически вызывается деструктор объекта, на который он указывает.
 
+
+##### Cоздание
 ```cpp
-std::unique_ptr ptr(new Image("~/photo.png"));
-// Вызов конструктора копирования.
-std::unique_ptr another_ptr = ptr; // ошибка
+#include <memory>
+
+std::unique_ptr<int> item(new int); // 1
+auto f2 = std::make_unique<int>(new int); //std::make_unique() решает проблему безопасности использования исключений, которая может возникнуть в результате неопределённого порядка обработки аргументов функции
 ```
 ```cpp
-std::unique_ptr ptr(new Image("~/photo.png"));
-//std::unique_ptr ptr = std::make_unique<Image>("~/photo.png");
-// Вызов конструктора перемещения.
-std::unique_ptr another_ptr = std::move(ptr);
-
-// |ptr| никуда не указывает.
-assert(ptr == nullptr);
-
-// |another_ptr| владеет объектом Image.
-assert(another_ptr != nullptr);
+some_function(std::unique_ptr<T>(new T), function_that_can_throw_exception());
 ```
-- Совеместимость с STL-контейнерами.
+Здесь компилятору предоставляется большая гибкость при обработке вызова функции. Он может сначала выделить новый T, затем вызвать function_that_can_throw_exception(), а затем уже создать std::unique_ptr, который управляет динамически выделенным T. Если function_that_can_throw_exception() выбросит исключение, то выделенный T не будет корректно удалён, поскольку умный указатель, который должен выполнить его удаление — не успеет создаться. Это приведёт к утечке памяти.
+
 ```cpp
-std::vector<std::unique_ptr> array;
-array.push_back(new Image("~/photo.png"));
+#include <iostream>
+#include <memory> // для std::unique_ptr
+
+class Item
+{
+public:
+	Item() { std::cout << "Item acquired\n"; }
+	~Item() { std::cout << "Item destroyed\n"; }
+};
+
+int main()
+{
+	std::unique_ptr<Item> item1(new Item); // выделение Item
+	std::unique_ptr<Item> item2; // присваивается значение nullptr
+
+	// item2 = item1; // не скомпилируется: семантика копирования отключена
+	item2 = std::move(item1); // item2 теперь владеет item1, а для item1 присваивается значение null
+
+	return 0;
+} // Item уничтожается здесь, когда item2 выходит из области видимости
 ```
+Поскольку std::unique_ptr разработан с учётом семантики перемещения, то семантика копирования по умолчанию отключена. Если вы хотите передать содержимое, управляемое std::unique_ptr, то вы должны использовать семантику перемещения. В программе выше мы передаём содержимое std::unique_ptr с помощью std::move() (который конвертирует item1 в r-value, которое является триггером для выполнения семантики перемещения вместо семантики копирования).
+
+std::unique_ptr имеет перегруженные операторы * и ->, которые используются для доступа к хранимым объектам. Оператор * возвращает ссылку на управляемый ресурс, а оператор -> возвращает указатель.
+```cpp
+#include <iostream>
+#include <memory>
+
+struct Foo {
+    void bar() { std::cout << "Foo::bar\n"; }
+};
+
+void f(const Foo& foo)
+{
+    std::cout << "f(const Foo&)\n";
+}
+
+int main()
+{
+    std::unique_ptr<Foo> ptr(new Foo);
+
+    ptr->bar();
+    f(*ptr);
+}  // Foo::bar   f(const Foo&)
+```
+##### Некоторые функции
+
+- get (возвращает указатель на управляемый объект)
+```cpp
+#include <iostream>
+#include <memory>
+
+int main () {
+                                           // foo   bar    p
+                                           // ---   ---   ---
+  std::unique_ptr<int> foo;                // null
+  std::unique_ptr<int> bar;                // null  null
+  int* p = nullptr;                        // null  null  null
+
+  foo = std::unique_ptr<int>(new int(10)); // (10)  null  null
+  bar = std::move(foo);                    // null  (10)  null
+  p = bar.get();                           // null  (10)  (10)
+
+  delete p;   // the program is now responsible of deleting the object pointed to by p
+              // bar deletes its managed object automatically
+
+  return 0;
+}
+```
+
+- reset (заменяет управляемый объект)
+```cpp
+#include <iostream>
+#include <memory>
+
+int main () {
+  std::unique_ptr<int> up;  // empty
+
+  up.reset (new int);       // takes ownership of pointer
+  *up=5;
+  std::cout << *up << '\n'; // 5
+
+  up.reset (new int);       // deletes managed object, acquires new pointer
+  *up=10;
+  std::cout << *up << '\n'; // 10
+
+  up.reset();               // deletes managed object
+
+  return 0;
+}
+```
+
+- release (возвращает указатель на управляемый объект и освобождает собственнось)
+```cpp
+#include <iostream>
+#include <memory>
+
+int main () {
+  std::unique_ptr<int> auto_pointer (new int);
+  int * manual_pointer;
+
+  *auto_pointer=10;
+
+  manual_pointer = auto_pointer.release();
+  // (auto_pointer is now empty)
+
+  std::cout << "manual_pointer points to " << *manual_pointer << '\n';
+
+  delete manual_pointer;
+
+```
+
+- swap (обменивает управляемые объекты)
+```cpp
+#include <iostream>
+#include <memory>
+
+int main () {
+  std::unique_ptr<int> foo (new int(10));
+  std::unique_ptr<int> bar (new int(20));
+
+  foo.swap(bar);
+
+  std::cout << "foo: " << *foo << '\n'; //20
+  std::cout << "bar: " << *bar << '\n'; //10
+
+  return 0;
+}
+```
+
+##### Ошибки
+- Во-первых, не позволяйте нескольким классам «владеть» одним и тем же ресурсом.
+
+```cpp
+Item *item = new Item;
+std::unique_ptr<Item> item1(item);
+std::unique_ptr<Item> item2(item);
+```
+Хотя это синтаксически допустимо, конечным результатом будет то, что и item1, и item2 попытаются удалить Item, что приведёт к неопределённому поведению/результатам.
+- Во-вторых, не удаляйте выделенный ресурс вручную из-под std::unique_ptr
+```cpp
+Item *item = new Item;
+std::unique_ptr<Item> item1(item);
+delete item;
+```
+Если вы это сделаете, std::unique_ptr попытается удалить уже удалённый ресурс, что снова приведёт к неопределённому поведению/результатам.
+Также возможно _передавать_ (использовать std::move()) и _возвращать_ (не должны возвращать std::unique_ptr по адресу (вообще) или по ссылке (если у вас нет на это веских причин) unique_ptr из функции
 
 #### 17. RAII. «Умные» указатели. std::weak_ptr. Примеры.
 ---
