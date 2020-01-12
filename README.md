@@ -1047,7 +1047,7 @@ public:
 ```
 _override_ - если метод не переопределяет виртуальную функцию родительского класса, то кимпилятор выдаст
 ошибку.
-
+##### Пример
 ```cpp
 class Base
 {
@@ -1183,38 +1183,110 @@ int main()
 
 #### 13. R-value ссылки. Семантика перемещения. std::move, std::forward. Пример.
 ---
-Rvalue ссылки – техническое расширение языка C++. Они позволяют компилятору определить, когда необходимо использовать перемещение, вместо копирования. Основное отличие rvalue от lvalue в том, что объекты rvalue могут быть перемещены, тогда как объекты lvalue всегда копируются.
-
-Семантика перемещения позволяет компиляторам заменять дорогостоящие операции копирования “дешевыми” перемещениями.
-
-```std::move()``` — это стандартная библиотечная функция, которая конвертирует передаваемый аргумент в r-value. Мы можем передать l-value в std::move(), и std::move() вернёт нам ссылку r-value.
-
+В С++ все переменные являются l-values(значение, которое имеет свой адрес памяти). Находятся в левой стороне
+ от операции присваивания. r-values -
+это значение, которое не имеет постоянного адреса в памяти.
+##### Пример
 ```cpp
-template<typename Т>
-typename remove_reference<T>::type&&
-move (T&& param) {
-    using ReturnType = typename remove_reference<T>::type&&;
-    return static_cast<ReturnType>(param);
+int a;
+а  = 5 ;
+а = а + 2; //слева а - l-values, а справа r-values
+```
+Rvalue ссылки - ссылки, которые инициализируются только значениями r-values (создается с ипользованием &&). Они позволяют компилятору определить, когда необходимо использовать перемещение, вместо копирования. Основное отличие rvalue от lvalue в том, что объекты rvalue могут быть перемещены, тогда как объекты lvalue всегда копируются.
+##### Плюсы:
+- они увеличивают продолжительность жизни объекта, которым инициализируются, до продолжительности жизни ссылки r-values (ссылки l-values на константные объекты также могут это сделать)
+- неконстантные ссылки r-values позволяют нам изменять значения r-values, на которые указывают ссылки r-values.
+```cpp
+int x = 7;
+int &l = x; //l-values ссылка
+int &&r = x; //r-values ссылка
+```
+Чаще всего r-values ссылки используют как параметры функции. Это наиболее полезно при перегрузке функций,
+когда вы хотите, чтобы выполение функции отличалось в зависимости от аргументов.
+Вы не должны возвращать ссылку r-values из функции, как и l-values. В большинстве случаев вы будете вовзращать висячую ссылку
+(указывающую на удаленную память), а объект, на который будет ссылаться ссылка - выйдет
+из области видимости в конце функции.
+##### Пример
+```cpp
+#include <iostream>
+
+void fun (const int &l)
+{
+    std::cout << "l-values reference";
+}
+
+void fun (int &&l)
+{
+    std::cout << "r-values reference";
+}
+int main()
+{
+    int x = 7;
+
+    fun(x); //аргумент l-values
+    fun(4); //аргумент r-values
 }
 ```
-Часть ```&&``` возвращаемого типа функции предполагает, что std::move возвращает rvalue-ccылкy, но, если тип т является rvаluе-ссылкой, Т&& становится lvаluе-ссылкой. Чтобы этого не произошло, к Т применяется свойство типа std::remove_reference, тем самым обеспечивая применение ```&&``` к типу, не являющемуся ссылкой. Это гарантирует, что std::move действительно возвращает rvаluе-ссылку.
+_Cемантика перемещения_ означает, что класс, вместо копирования, передает право собственности на объект.
 
-```std::forward``` представляет собой условное приведение (в отличии от ```std::move```), эта функция выполняет приведение к rvalue только тогда, когда ее аргумент инициализирован rvalue.
-
-###### пример
+```std::move()``` — это стандартная библиотечная функция, которая конвертирует передаваемый аргумент в r-value. Мы можем передать l-value в std::move(), и std::move() вернёт нам ссылку r-value.
+##### Пример
 ```cpp
-void process ( const Widget& lvalArg) ; // Обработка lvalue
-void process (Widget&& rvalArg); // Обработка rvalue
+#include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
 
-template<typename Т>            // шаблон, передающий
-void logAndProcess (T&& param)  // param на обработку
+int main()
 {
-    auto now = std::chrono::system_clock::now(); // Получает текущее время
-    process (std::forward<T>(param));
+	std::vector<std::string> v;
+	std::string str = "Bye";
+
+	std::cout << "Copying str\n";
+	v.push_back(str); // вызывает версию l-value метода push_back, которая копирует str в элемент массива
+
+	std::cout << "str: " << str << '\n'; //Bye
+	std::cout << "vector: " << v[0] << '\n'; // Bye
+
+	std::cout << "\nMoving str\n";
+
+	v.push_back(std::move(str)); // вызывает версию r-value метода push_back, которая перемещает str в элемент массива
+
+	std::cout << "str: " << str << '\n'; // ничего
+	std::cout << "vector: " << v[0] << ' ' << v[1] << '\n';  //Bye Bye
+
+	return 0;
+}
+```
+
+```std::forward``` представляет собой условное приведение (в отличии от ```std::move```), эта функция выполняет приведение к rvalue только тогда, когда ее аргумент инициализирован rvalue, иначе
+возвращает lvalue без изменения ее типа.
+
+###### Пример
+```cpp
+#include <utility>      // std::forward
+#include <iostream>     // std::cout
+
+// function with lvalue and rvalue reference overloads:
+void overloaded (const int& x) {std::cout << "[lvalue]\n";}
+void overloaded (int&& x) {std::cout << "[rvalue]\n";}
+
+// function template taking rvalue reference to deduced type:
+template <class T> void fn (T&& x) {
+  overloaded (x);                   // always an lvalue
+  overloaded (std::forward<T>(x));  // rvalue if argument is rvalue
 }
 
-logAndProcess (w); // Вызов с lvalue
-logAndProcess (std::move(w)); // Вызов с rvalue
+int main () {
+  int a;
+  std::cout << "calling fn with lvalue: ";
+  fn (a);
+
+  std::cout << "calling fn with rvalue: ";
+  fn (0);
+
+  return 0;
+}
 ```
 
 #### 14. Обработка ошибок с использованием механизма обработки исключений. RAII. Примеры классов, использующих RAII. Ключевое слово noexcept.
