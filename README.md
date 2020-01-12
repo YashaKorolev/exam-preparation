@@ -36,11 +36,11 @@ struct list
 ```cpp
 struct list * init (int a) // а - значение первого узла
 {
-    struct list *lst;
+    struct list *lst = new struct list();
     lst -> field = a;
     lst -> next = NULL; //указатель на следующий элемент (его нет)
     lst -> prev = NULL; //указатель на предыдущий элемент (его нет)
-    return(lst);
+    return (lst);
 }
 ```
 ##### Функция добавления узла принимает:
@@ -51,20 +51,25 @@ struct list * init (int a) // а - значение первого узла
 - изменение указателей элементов, соседних с новым
 - функция выводит адрес добавляемого узла
 ```cpp
-strust list * addlem (list *lst, int number)
+struct list * addlem (list *lst, int number)
 {
-    strust list *temp;
-    strust list p;
+    list* temp = new list; // создание нового узла
 
-    p = lst->next; //сохраение указателя на следующий узел
-    lst->next = temp; // предыдущий узел указывает на вставляемый
-    temp->field = number;
-    temp->next = p;
-    temp->prev = lst;
+	temp->next = temp->prev = nullptr; // обнул указателей на другие узлы
+	temp->field = number;  // занесение в нов узел данных 
 
-    if (p != NULL)
-      p->prev = temp;
-    return (temp);
+	if (lst->next == nullptr) {
+		lst->next = temp;
+		temp->prev = lst;
+	}
+	else {
+		temp->next = lst->next;  // нов узел соед со след
+		temp->prev = lst;	     // нов узел соед с пред
+		lst->next = temp;        // пред соед с нов
+		temp->next->prev = temp; // след соед с нов
+	}
+
+	return temp; // возвр нов узел
 }
 ```
 ##### Удаление элемента списка
@@ -107,7 +112,7 @@ bool search(list *lst, int number)
 - Вставка/удаление - O(1)
 - Поиск элемента - O(N)
 ##### LIST
-Этот контейнер быстро добавляет и удаляет значения, потому что не пприходится
+Этот контейнер быстро добавляет и удаляет значения, потому что не приходится
 перемещать элементы между собой, а нужно только грамотно манипулировать
 указателями.
 
@@ -141,7 +146,7 @@ int main() {
     std::list<int> mylist1 = {1,2,3,4};
     std::list<int> mylist2 = {10,20,30};
 
-    it = mylist1.begin();
+    auto it = mylist1.begin();
     ++it;
     mylist1.splice (it, mylist2);
     // mylist1 1 10 20 30 2 3 4
