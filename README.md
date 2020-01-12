@@ -1668,50 +1668,134 @@ delete item;
 #### 17. RAII. «Умные» указатели. std::weak_ptr. Примеры.
 ---
 
-Одной из проблем при работе является с ```std::shared_ptr``` является возможность создания циклической ссылки (например когда два объекта ссылаются друг на друга, таким образом счетчик не обнулится и не будет вызван деструктор -> утечки памяти).
+Одной из проблем при работе является с ```std::shared_ptr``` является возможность создания циклической ссылки (например когда два объекта ссылаются друг на друга, таким образом счетчик не обнулится и не будет вызван деструктор утечки памяти).
 
 Эту проблему можно решить при помощи использования ```std::weak_ptr``` — он может наблюдать и получать доступ к тому же объекту, на который указывает std::shared_ptr (или другой std::weak_ptr), но не считаться владельцем этого объекта.
+##### Пример
+```cpp
+#include <iostream>
+#include <memory> // для std::shared_ptr и std::weak_ptr
+#include <string>
+
+class Human
+{
+	std::string m_name;
+	std::weak_ptr<Human> m_partner; // обратите внимание, здесь std::weak_ptr
+
+public:
+
+	Human(const std::string &name): m_name(name)
+	{
+		std::cout << m_name << " created\n";
+	}
+	~Human()
+	{
+		std::cout << m_name << " destroyed\n";
+	}
+
+	friend bool partnerUp(std::shared_ptr<Human> &h1, std::shared_ptr<Human> &h2)
+	{
+		if (!h1 || !h2)
+			return false;
+
+		h1->m_partner = h2;
+		h2->m_partner = h1;
+
+		std::cout << h1->m_name << " is now partnered with " << h2->m_name << "\n";
+
+		return true;
+	}
+};
+
+int main()
+{
+	auto anton = std::make_shared<Human>("Anton");
+	auto ivan = std::make_shared<Human>("Ivan");
+
+	partnerUp(anton, ivan);
+
+	return 0;
+}
+```
+Когда ivan выходит из области видимости, он видит, что нет другого std::shared_ptr, указывающего на Ivan-а (std::weak_ptr из Anton-а не считается). Поэтому он уничтожает Ivan-а. То же самое происходит и с Anton-ом.
 
 Недостатком std::weak_ptr является то, что его нельзя использовать напрямую (нет оператора ->). Чтобы использовать std::weak_ptr, вы сначала должны конвертировать его в std::shared_ptr (с помощью метода lock()), а затем уже использовать std::shared_ptr.
 
+##### Функции
+
+- lock (создает shared_ptr, который управляет объектом, на который ссылается weak_ptr)
 ```cpp
-#include <memory>
 #include <iostream>
+#include <memory>
 
-class SomeClass {
-public:
-    void sayHello() {
-        std::cout << "Hello!" << std::endl;
-    }
+int main () {
+  std::shared_ptr<int> sp1,sp2;
+  std::weak_ptr<int> wp;
+                                       // sharing group:
+                                       // --------------
+  sp1 = std::make_shared<int> (20);    // sp1
+  wp = sp1;                            // sp1, wp
 
-    ~SomeClass() {
-        std::cout << "~SomeClass" << std::endl;
-    }
-};
+  sp2 = wp.lock();                     // sp1, wp, sp2
+  sp1.reset();                         //      wp, sp2
 
-int main() {
-    std::weak_ptr<SomeClass> wptr;
+  sp1 = wp.lock();                     // sp1, wp, sp2
 
-    {
-        auto ptr = std::make_shared<SomeClass>();
-        wptr = ptr;
+  std::cout << "*sp1: " << *sp1 << '\n'; //20
+  std::cout << "*sp2: " << *sp2 << '\n'; //20
 
-        if(auto tptr = wptr.lock()) {
-            tptr->sayHello();
-        } else {
-            std::cout << "lock() failed" << std::endl;
-        }
-    }
-
-    if(auto tptr = wptr.lock()) {
-        tptr->sayHello();
-    } else {
-        std::cout << "lock() failed" << std::endl;
-    }
+  return 0;
 }
 ```
 
+- expired (проверяет, был ли удален объект, на который ссылается weak_ptr (true, если управляемый объект уже удалён, false — если остался в памяти.))
+```cpp
+#include <iostream>
+#include <memory>
 
+std::weak_ptr<int> gw;
+
+void f()
+{
+    if (!gw.expired()) {
+    std::cout << "gw is valid\n";
+    }
+    else {
+        std::cout << "gw is expired\n";
+    }
+}
+
+int main()
+{
+    {
+        auto sp = std::make_shared<int>(42);
+    gw = sp;
+
+    f();
+    }
+
+    f();
+}
+```
+- reset (прекращает владение управляемым объектом)
+```cpp
+#include <iostream>
+#include <memory>
+
+int main () {
+  std::shared_ptr<int> sp (new int(10));
+
+  std::weak_ptr<int> wp(sp);
+
+  wp.reset();
+
+  std::cout << "2. wp ";
+   if (wp.expired()==false)
+   std::cout << "is" << " expired\n";
+
+  return 0;
+}
+```
 #### 18. Сетевое взаимодействие. Berkley sockets. Основные функции для работы с сокетами
 ---
 
